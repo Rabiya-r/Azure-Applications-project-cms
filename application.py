@@ -1,14 +1,20 @@
 """
-This script runs the FlaskWebProject application using a development server.
+This script exposes the FlaskWebProject application as a WSGI callable.
+Azure App Service / Gunicorn will use this file to run the app.
 """
 
-from os import environ
-from FlaskWebProject import app
+from FlaskWebProject import app  # import your Flask app
 
+# Rename app object to 'application' for Azure
+application = app
+
+# Optional: only run dev server if executed directly (not used by Gunicorn)
 if __name__ == '__main__':
-    HOST = environ.get('SERVER_HOST', 'localhost')
+    from os import environ
+    host = environ.get('SERVER_HOST', '0.0.0.0')  # Azure binds to 0.0.0.0
     try:
-        PORT = int(environ.get('SERVER_PORT', '8000'))
+        port = int(environ.get('SERVER_PORT', '8000'))
     except ValueError:
-        PORT = 5555
-    app.run(HOST, PORT, ssl_context='adhoc')
+        port = 8000
+    # Remove ssl_context for dev in Azure or keep for local testing
+    application.run(host, port, debug=True, ssl_context='adhoc')
