@@ -1,9 +1,5 @@
-"""
-Routes and views for the flask application.
-"""
-
 from datetime import datetime
-from flask import render_template, flash, redirect, request, session, url_for
+from flask import render_template, flash, redirect, request, session, url_for, current_app
 from werkzeug.urls import url_parse
 from config import Config
 from FlaskWebProject import app, db
@@ -13,22 +9,18 @@ from FlaskWebProject.models import User, Post
 import msal
 import uuid
 
-# Construct base image URL for blobs
-IMAGE_SOURCE_URL = f"https://{Config.BLOB_ACCOUNT}.blob.core.windows.net/{Config.BLOB_CONTAINER}/"
-
-
 @app.route('/')
 @app.route('/home')
 @login_required
 def home():
     posts = Post.query.all()
+    image_source_url = f"https://{current_app.config['BLOB_ACCOUNT']}.blob.core.windows.net/{current_app.config['BLOB_CONTAINER']}/"
     return render_template(
         'index.html',
         title='Home Page',
         posts=posts,
-        imageSource=IMAGE_SOURCE_URL
+        imageSource=image_source_url
     )
-
 
 @app.route('/new_post', methods=['GET', 'POST'])
 @login_required
@@ -39,13 +31,13 @@ def new_post():
         file = request.files.get('image_path')
         post.save_changes(form, file, current_user.id, new=True)
         return redirect(url_for('home'))
+    image_source_url = f"https://{current_app.config['BLOB_ACCOUNT']}.blob.core.windows.net/{current_app.config['BLOB_CONTAINER']}/"
     return render_template(
         'post.html',
         title='Create Post',
         form=form,
-        imageSource=IMAGE_SOURCE_URL
+        imageSource=image_source_url
     )
-
 
 @app.route('/post/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -56,14 +48,14 @@ def post(id):
         file = request.files.get('image_path')
         post.save_changes(form, file, current_user.id)
         return redirect(url_for('home'))
+    image_source_url = f"https://{current_app.config['BLOB_ACCOUNT']}.blob.core.windows.net/{current_app.config['BLOB_CONTAINER']}/"
     return render_template(
         'post.html',
         title='Edit Post',
         form=form,
-        imageSource=IMAGE_SOURCE_URL,
+        imageSource=image_source_url,
         post=post
     )
-
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -73,7 +65,7 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
-        if user is None or not user.check_password(form.password.data):
+        if user is None or not user.password_hash == form.password.data:
             flash('Invalid username or password')
             app.logger.warning(f"Invalid login attempt for username '{form.username.data}'")
             return redirect(url_for('login'))
@@ -90,7 +82,6 @@ def login():
     session["state"] = str(uuid.uuid4())
     auth_url = _build_auth_url(scopes=Config.SCOPE, state=session["state"])
     return render_template('login.html', title='Sign In', form=form, auth_url=auth_url)
-
 
 @app.route(Config.REDIRECT_PATH)
 def authorized():
@@ -119,7 +110,6 @@ def authorized():
 
     return redirect(url_for('home'))
 
-
 @app.route('/logout')
 def logout():
     logout_user()
@@ -131,20 +121,16 @@ def logout():
         )
     return redirect(url_for('login'))
 
-
 # ---------------- MSAL helpers ----------------
-
 def _load_cache():
     cache = msal.SerializableTokenCache()
     if session.get("token_cache"):
         cache.deserialize(session["token_cache"])
     return cache
 
-
 def _save_cache(cache):
     if cache.has_state_changed:
         session["token_cache"] = cache.serialize()
-
 
 def _build_msal_app(cache=None, authority=None):
     return msal.ConfidentialClientApplication(
@@ -153,7 +139,6 @@ def _build_msal_app(cache=None, authority=None):
         client_credential=Config.CLIENT_SECRET,
         token_cache=cache
     )
-
 
 def _build_auth_url(authority=None, scopes=None, state=None):
     return _build_msal_app(authority=authority).get_authorization_request_url(
