@@ -8,4 +8,4 @@ application = app
 if __name__ == '__main__':
     host = environ.get('SERVER_HOST', '0.0.0.0')
     port = int(environ.get('SERVER_PORT', 8000))
-    application.run(host=host, port=port, debug=True)  # remove ssl_context for local dev
+    application.run(host=host, port=port, debug=True)  
