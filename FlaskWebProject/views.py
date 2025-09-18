@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import render_template, flash, redirect, request, session, url_for, current_app
-from werkzeug.urls import url_parse
+from urllib.parse import urlparse
 from config import Config
 from FlaskWebProject import app, db
 from FlaskWebProject.forms import LoginForm, PostForm
@@ -74,7 +74,7 @@ def login():
         app.logger.info(f"User '{user.username}' logged in successfully")
 
         next_page = request.args.get('next')
-        if not next_page or url_parse(next_page).netloc != '':
+        if not next_page or urlparse(next_page).netloc != '':
             next_page = url_for('home')
         return redirect(next_page)
 
