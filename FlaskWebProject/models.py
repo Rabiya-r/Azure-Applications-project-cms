@@ -1,14 +1,9 @@
 from datetime import datetime
-from FlaskWebProject import app, db
+from FlaskWebProject import db
 from werkzeug.utils import secure_filename
-from flask import flash
+from flask import flash, current_app
 from azure.storage.blob import BlobServiceClient
 import string, random
-
-# Blob setup
-blob_container = app.config['BLOB_CONTAINER']
-storage_url = f"https://{app.config['BLOB_ACCOUNT']}.blob.core.windows.net/"
-blob_service = BlobServiceClient(account_url=storage_url, credential=app.config['BLOB_STORAGE_KEY'])
 
 def id_generator(size=32, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -28,7 +23,7 @@ class Post(db.Model):
     title = db.Column(db.String(150), nullable=False)
     author = db.Column(db.String(75), nullable=False)
     body = db.Column(db.String(800), nullable=False)
-    image_path = db.Column(db.String(256))   # just filename
+    image_path = db.Column(db.String(256))
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
 
@@ -48,13 +43,24 @@ class Post(db.Model):
             new_filename = id_generator(16) + "." + ext
 
             try:
-                # Upload new blob
-                blob_client = blob_service.get_blob_client(container=blob_container, blob=new_filename)
+                # Setup blob client dynamically
+                storage_url = f"https://{current_app.config['BLOB_ACCOUNT']}.blob.core.windows.net/"
+                blob_service = BlobServiceClient(
+                    account_url=storage_url,
+                    credential=current_app.config['BLOB_STORAGE_KEY']
+                )
+                blob_client = blob_service.get_blob_client(
+                    container=current_app.config['BLOB_CONTAINER'],
+                    blob=new_filename
+                )
                 blob_client.upload_blob(file, overwrite=True)
 
                 # Delete old blob if replacing
                 if self.image_path:
-                    old_blob = blob_service.get_blob_client(container=blob_container, blob=self.image_path)
+                    old_blob = blob_service.get_blob_client(
+                        container=current_app.config['BLOB_CONTAINER'],
+                        blob=self.image_path
+                    )
                     try:
                         old_blob.delete_blob()
                     except Exception:
